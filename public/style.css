@@ -25,7 +25,8 @@ html, body {
   background: var(--bg);
   color: var(--ink);
   height: 100%;
-  overflow: hidden; /* the page itself never scrolls — it's a room, not a document */
+  overflow-x: hidden;
+  overflow-y: auto; /* longer conversational replies may need to scroll on short viewports */
 }
 
 body {
@@ -185,7 +186,9 @@ body {
 
 .response-zone {
   min-height: 64px;
-  width: min(440px, 86vw);
+  max-height: 38vh;
+  overflow-y: auto;
+  width: min(560px, 90vw);
   display: flex;
   align-items: flex-start;
   justify-content: center;
