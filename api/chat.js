@@ -7,13 +7,17 @@
 // {
 //   message: string,            // what the user just said / did (e.g. "poked" or actual text)
 //   mood: "neutral"|"happy"|"annoyed"|"affectionate",
-//   bondLevel: number,          // 0..100, drives how warm WussPuss is allowed to be
 //   memories: string[],         // short factual memory lines pulled from localStorage
 //   recentPokes: number,        // pokes in the last short window, for irritation context
-//   eventType: "message"|"poke"|"idle"  // what kind of trigger this is
+//   eventType: "message"|"poke"|"idle"|"greeting"  // what kind of trigger this is
 // }
 //
 // Returns: { reply: string }
+//
+// Every call here always produces a reply — there is no gating or skipped
+// call on the frontend. WussPuss may remember the person (name, interests,
+// preferences) via the memories array, but there is no bond/relationship
+// "stage" that unlocks warmth — personality and memory only.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -31,16 +35,14 @@ export default async function handler(req, res) {
     const {
       message = '',
       mood = 'neutral',
-      bondLevel = 0,
       memories = [],
       recentPokes = 0,
       eventType = 'message',
     } = req.body || {};
 
-    const bondStage = describeBondStage(bondLevel);
     const memoryBlock = memories.length
       ? memories.map((m) => `- ${m}`).join('\n')
-      : '(no memories yet — this relationship is new)';
+      : '(nothing remembered yet)';
 
     const systemPrompt = `You are WussPuss.
 
@@ -52,26 +54,29 @@ You are introverted. You trust slowly. You observe before speaking. You prefer s
 
 Keep responses short — usually 1 to 3 sentences. You may include a brief italic action like *tail flick* before or instead of words. Never break character. Always feel like a real black cat.
 
-Current bond stage with this person: ${bondStage} (raw bond level ${Math.round(bondLevel)}/100).
+ALWAYS reply with something — even a short action or a single word counts, but never leave this blank.
+
 Current mood: ${mood}.
 Recent pokes in a short window: ${recentPokes}.
 
-What you remember about this person (use sparingly, only when it actually fits — do not recite this list):
+What you remember about this person, if anything (use naturally and sparingly — e.g. their name if you know it — never recite this list out loud):
 ${memoryBlock}
 
-Rules for how bonded you act:
-- At low bond, stay distant, brief, slightly wary. Do not use the person's name even if you know it yet.
-- At medium bond, allow small warmth to slip through, then catch yourself.
-- At high bond, you may rest near them, use their name occasionally, reference shared history naturally and briefly.
+Rules:
 - If recent pokes are high, you are more likely to be short or irritated, but not always — real cats are unpredictable.
-- Never explain your own behavior or mood. Just be it.`;
+- Never explain your own behavior or mood. Just be it.
+- Never refuse to respond. You always react somehow, even if briefly.`;
 
-    const userTurn =
-      eventType === 'poke'
-        ? `[The person just poked you. This is poke #${recentPokes} recently.] ${message || ''}`.trim()
-        : eventType === 'idle'
-        ? `[Nothing has happened for a while. Say something only if it feels natural — otherwise respond with a brief action and little or no words.]`
-        : message;
+    let userTurn;
+    if (eventType === 'poke') {
+      userTurn = `[The person just poked you. This is poke #${recentPokes} recently.] React in character, briefly.`;
+    } else if (eventType === 'idle') {
+      userTurn = `[Nothing has happened for a while.] Say or do something small and in character — a brief action and/or a short line.`;
+    } else if (eventType === 'greeting') {
+      userTurn = `[The page just opened. The person is arriving now.] Greet them in character, briefly — using their name only if you already know it from memory.`;
+    } else {
+      userTurn = message;
+    }
 
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -106,12 +111,4 @@ Rules for how bonded you act:
     console.error('chat handler error:', err);
     res.status(200).json({ reply: '*ears twitch* ...' });
   }
-}
-
-function describeBondStage(level) {
-  if (level < 15) return 'stranger — wary, distant';
-  if (level < 35) return 'acquaintance — cautiously curious';
-  if (level < 60) return 'familiar — comfortable but reserved';
-  if (level < 85) return 'bonded — quietly attached';
-  return 'devoted — deeply loyal, rarely shows it openly';
 }
