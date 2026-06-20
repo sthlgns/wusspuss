@@ -1,9 +1,13 @@
 /* =========================================================================
    WussPuss — app.js
    A black cat lives on this page. This file is the entire nervous system:
-   idle life (breathing, blinking, eye tracking, tail twitches), a small
-   mood engine for pokes, a relationship/bond model persisted to
-   localStorage, and the two API calls that let WussPuss actually speak.
+   idle life (breathing, blinking, eye tracking, tail twitches), a mood
+   system for pokes, a simple long-term memory of the person (name,
+   interests, preferences) persisted to localStorage, and the two API
+   calls that let WussPuss actually speak.
+
+   Every poke and every typed message always gets a real reply from
+   Gemini — there is no random chance of skipping the call.
    ========================================================================= */
 
 (() => {
@@ -18,7 +22,6 @@
   const pupilLeft = document.getElementById('pupilLeft');
   const pupilRight = document.getElementById('pupilRight');
   const responseLine = document.getElementById('responseLine');
-  const nameLabel = document.getElementById('nameLabel');
   const inputForm = document.getElementById('inputForm');
   const textInput = document.getElementById('textInput');
 
@@ -35,17 +38,15 @@
   };
 
   // -----------------------------------------------------------------------
-  // Persisted state: relationship memory + bond level.
-  // Kept deliberately small and human-readable in localStorage.
+  // Persisted state: just long-term memory of the person. No bond level,
+  // no visit counting, no relationship-stage gating — only what WussPuss
+  // has learned about you (name, interests, preferences, meaningful
+  // moments), kept small and human-readable in localStorage.
   // -----------------------------------------------------------------------
   const STORE_KEY = 'wusspuss.v1';
 
   const defaultState = () => ({
-    bondLevel: 0,            // 0..100, grows slowly across visits
-    visits: 0,
-    lastVisit: null,
-    memories: [],            // short factual strings, deduped
-    totalPokesEver: 0,
+    memories: [], // short factual strings, deduped
   });
 
   function loadState() {
@@ -69,28 +70,9 @@
 
   const state = loadState();
 
-  // First-visit-of-session bookkeeping for bond growth (gentle, time-gated
-  // so bond can't be farmed by spamming — it grows with *returning*, not
-  // with message volume).
-  const now = Date.now();
-  const isNewDay =
-    !state.lastVisit || now - state.lastVisit > 1000 * 60 * 60 * 18; // ~18h gap counts as a new "day"
-  if (isNewDay) {
-    state.visits += 1;
-    // Diminishing returns as bond approaches 100.
-    const room = 100 - state.bondLevel;
-    state.bondLevel = Math.min(100, state.bondLevel + Math.max(1, room * 0.08));
-  }
-  state.lastVisit = now;
-  saveState();
-
-  function bondStageClass() {
-    return state.bondLevel >= 35 ? 'bonded' : '';
-  }
-  nameLabel.className = `name ${bondStageClass()}`;
-
   // -----------------------------------------------------------------------
-  // Mood engine
+  // Mood engine — purely about pokes-in-quick-succession, unrelated to any
+  // long-term relationship state. Unpredictable, like a real cat.
   // -----------------------------------------------------------------------
   let mood = 'neutral'; // neutral | happy | annoyed | affectionate
   let recentPokeTimestamps = [];
@@ -101,27 +83,17 @@
     recentPokeTimestamps.push(t);
     // keep only pokes from the last 12 seconds for irritation math
     recentPokeTimestamps = recentPokeTimestamps.filter((p) => t - p < 12000);
-    state.totalPokesEver += 1;
-    saveState();
     return recentPokeTimestamps.length;
   }
 
   function chooseMoodForPoke(recentCount) {
-    // Unpredictable, like a real cat: irritation probability rises with
-    // poke frequency but is never certain, and bonded cats forgive faster.
-    const bondFactor = state.bondLevel / 100; // 0..1, more bonded = more tolerant
-    const irritationChance = Math.min(
-      0.85,
-      Math.max(0, (recentCount - 1) * 0.22 - bondFactor * 0.25)
-    );
+    // Irritation probability rises with poke frequency but is never
+    // certain — never fully predictable, like a real cat.
+    const irritationChance = Math.min(0.85, Math.max(0, (recentCount - 1) * 0.25));
     const roll = Math.random();
 
     if (roll < irritationChance) return 'annoyed';
-
-    // Otherwise lean toward affection more often once bonded.
-    const affectionChance = 0.35 + bondFactor * 0.35;
-    if (Math.random() < affectionChance) return 'affectionate';
-
+    if (Math.random() < 0.45) return 'affectionate';
     return 'happy';
   }
 
@@ -141,39 +113,6 @@
       setTimeout(() => catBody.classList.remove('bounce'), 550);
     }
     mood = nextMood;
-  }
-
-  // -----------------------------------------------------------------------
-  // Canned micro-reactions shown immediately on poke, before/instead of
-  // waiting on the network — keeps the creature feeling instantly alive.
-  // The model call (below) may still follow up with something richer if
-  // this poke also included typed words.
-  // -----------------------------------------------------------------------
-  const POKE_LINES = {
-    happy: [
-      '*purrs softly*',
-      '*slow blink* "You again."',
-      '*leans in slightly*',
-      '"...fine. One more."',
-      '*tail swishes gently*',
-    ],
-    affectionate: [
-      '*slow blink*',
-      '*settles a little closer*',
-      '"I suppose that\'s acceptable."',
-      '*soft purring*',
-    ],
-    annoyed: [
-      '*ears flatten* "Enough."',
-      '*tail lashes once*',
-      '*glares* "Do that again."',
-      '"Hm."',
-      '*turns away*',
-    ],
-  };
-
-  function randomFrom(arr) {
-    return arr[Math.floor(Math.random() * arr.length)];
   }
 
   // -----------------------------------------------------------------------
@@ -215,7 +154,6 @@
           message,
           eventType,
           mood,
-          bondLevel: state.bondLevel,
           memories: state.memories,
           recentPokes: recentPokeTimestamps.length,
         }),
@@ -251,8 +189,8 @@
   }
 
   function mergeMemories(newOnes) {
-    const normalized = (s) => s.trim().toLowerCase();
-    const existingSet = new Set(state.memories.map(normalized));
+    const normalize = (s) => s.trim().toLowerCase();
+    const existingSet = new Set(state.memories.map(normalize));
     for (const m of newOnes) {
       const clean = m.trim();
       if (!clean) continue;
@@ -266,12 +204,9 @@
     }
     saveState();
   }
-  function normalize(s) {
-    return s.trim().toLowerCase();
-  }
 
   // -----------------------------------------------------------------------
-  // Poke handling
+  // Poke handling — every poke always gets a real reply from Gemini.
   // -----------------------------------------------------------------------
   catWrap.addEventListener('click', async (e) => {
     e.preventDefault();
@@ -283,22 +218,17 @@
     const nextMood = chooseMoodForPoke(recentCount);
     applyMoodVisual(nextMood);
 
-    // Instant local reaction line for responsiveness.
-    const line = randomFrom(POKE_LINES[nextMood] || POKE_LINES.happy);
-    showResponse(line);
+    // Show a brief, instant local placeholder so the cat reacts immediately
+    // while the real reply is on its way — never the final word, always
+    // overwritten by the model's actual response below.
+    showResponse('*reacts*');
 
-    // Occasionally let the model produce a richer line instead, especially
-    // once some bond exists — but don't fire a network call on every single
-    // poke, or it stops feeling like a cat and starts feeling like a chatbot.
-    const shouldAskModel = Math.random() < 0.25 + state.bondLevel / 400;
-    if (shouldAskModel) {
-      const reply = await askWussPuss({ message: 'poke', eventType: 'poke' });
-      showResponse(reply);
-    }
+    const reply = await askWussPuss({ message: 'poke', eventType: 'poke' });
+    showResponse(reply);
   });
 
   // -----------------------------------------------------------------------
-  // Text input handling
+  // Text input handling — every message always gets a real reply.
   // -----------------------------------------------------------------------
   inputForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -312,20 +242,12 @@
     const reply = await askWussPuss({ message: text, eventType: 'message' });
     showResponse(reply);
 
-    // Gentle bond nudge for genuine engagement, separate from the daily
-    // visit-based growth above — small, capped, so it can't be farmed by
-    // spamming short messages.
-    state.bondLevel = Math.min(100, state.bondLevel + 0.3);
-    saveState();
-    nameLabel.className = `name ${bondStageClass()}`;
-
     extractMemoryFrom(text, reply);
   });
 
   // -----------------------------------------------------------------------
   // Idle life: breathing (CSS-driven, just toggled on), blinking,
-  // occasional autonomous lines, and tail-ish micro motion via filter-free
-  // transform nudges on the body (kept extremely subtle).
+  // and occasional autonomous lines/model calls.
   // -----------------------------------------------------------------------
   catBody.classList.add('breathing');
 
@@ -358,6 +280,10 @@
     '*tail flicks once, then stills*',
     '*stares at a spot on the floor*',
   ];
+
+  function randomFrom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
 
   function scheduleIdleMoment() {
     const delay = 75000 + Math.random() * 140000; // roughly 1.25–3.5 min
@@ -473,21 +399,8 @@
   }
 
   // -----------------------------------------------------------------------
-  // First-paint greeting, scaled to bond level — this is the relationship
-  // progression made visible on the very first thing the cat "says."
-  // -----------------------------------------------------------------------
-  function initialGreeting() {
-    if (state.bondLevel < 15) {
-      return randomFrom(['*glances briefly* "...Hello."', '*watches you from a distance*']);
-    }
-    if (state.bondLevel < 60) {
-      return randomFrom(['*settles nearby* "You came back."', '*ears flick toward you*']);
-    }
-    return randomFrom(['*rests beside you* "I kept this spot warm."', '*low purr* "There you are."']);
-  }
-
-  // -----------------------------------------------------------------------
-  // Boot
+  // Boot — opening line always comes from the model itself, using whatever
+  // memories already exist (e.g. it may use your name if it knows it).
   // -----------------------------------------------------------------------
   function init() {
     // Place pupils once layout settles, before the loop takes over.
@@ -497,7 +410,8 @@
       placePupil(pupilRight, EYES.right, 0, 0, imgRect);
     });
 
-    setTimeout(() => showResponse(initialGreeting()), 900);
+    showResponse('*notices you*');
+    askWussPuss({ message: '', eventType: 'greeting' }).then(showResponse);
 
     scheduleBlink();
     scheduleSlowBlink();

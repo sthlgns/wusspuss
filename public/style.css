@@ -61,10 +61,7 @@ body {
   transition: opacity 1.2s ease, color 1.2s ease;
 }
 
-/* As the bond deepens, the name warms very slightly — barely perceptible. */
-.name.bonded {
-  color: #4a4440;
-}
+/* (Bond-based name styling removed — personality and memory only now.) */
 
 /* ---------- Cat ---------- */
 
