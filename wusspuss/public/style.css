@@ -1,0 +1,294 @@
+/* =========================================================================
+   WussPuss — stylesheet
+   Philosophy: the page is a still room with one living thing in it.
+   No cards, no borders, no shadows beyond the cat's own contact shadow,
+   no color beyond near-black ink on white. Every motion belongs to the cat.
+   ========================================================================= */
+
+:root {
+  --ink: #0a0a0a;
+  --ink-soft: #6b6b6b;
+  --hairline: #e7e4df;
+  --bg: #ffffff;
+
+  --cat-size: 220px;
+  --bond-glow: 0; /* 0..1, nudged by JS as bond deepens — see app.js */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  height: 100%;
+  overflow: hidden; /* the page itself never scrolls — it's a room, not a document */
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  padding: 24px;
+  user-select: none;
+}
+
+/* ---------- Name ---------- */
+
+.name {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 28px 0;
+  opacity: 0.7;
+  transition: opacity 1.2s ease, color 1.2s ease;
+}
+
+/* As the bond deepens, the name warms very slightly — barely perceptible. */
+.name.bonded {
+  color: #4a4440;
+}
+
+/* ---------- Cat ---------- */
+
+.cat-wrap {
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0 0 6px 0;
+  cursor: pointer;
+  width: var(--cat-size);
+  height: var(--cat-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cat-wrap:focus-visible {
+  outline: 2px solid var(--ink-soft);
+  outline-offset: 8px;
+  border-radius: 8px;
+}
+
+.cat-shadow {
+  position: absolute;
+  bottom: 4%;
+  left: 50%;
+  width: 58%;
+  height: 14px;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0) 75%);
+  transform: translateX(-50%);
+  transition: width 0.6s ease, opacity 0.6s ease;
+  pointer-events: none;
+}
+
+.cat-body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 88%; /* roughly the cat's haunches — lean/tilt pivots from where it sits */
+  will-change: transform;
+}
+
+.cat-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* Pupils: small dark dots placed via JS to align with the source image's eye-white
+   regions, then nudged within that bound for the eye-tracking illusion. */
+.pupil {
+  position: absolute;
+  width: 4.6%;
+  height: 4.6%;
+  background: var(--ink);
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.08s ease;
+}
+
+/* ---------- Mood animation states (applied to .cat-body) ---------- */
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50%      { transform: scale(1.012) translateY(-1.5px); }
+}
+
+.cat-body.breathing {
+  animation: breathe 4.2s ease-in-out infinite;
+}
+
+@keyframes purr-rumble {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25%      { transform: translateY(0.4px) rotate(-0.15deg); }
+  75%      { transform: translateY(-0.4px) rotate(0.15deg); }
+}
+
+.cat-body.affectionate {
+  animation: purr-rumble 0.42s ease-in-out infinite;
+}
+
+@keyframes annoyed-recoil {
+  0%   { transform: scale(1) translateX(0) rotate(0deg); }
+  15%  { transform: scale(0.985) translateX(-3px) rotate(-1.2deg); }
+  35%  { transform: scale(0.99) translateX(2px) rotate(1deg); }
+  55%  { transform: scale(0.985) translateX(-1.5px) rotate(-0.6deg); }
+  100% { transform: scale(1) translateX(0) rotate(0deg); }
+}
+
+.cat-body.annoyed {
+  animation: annoyed-recoil 0.5s ease-out 1;
+}
+
+@keyframes happy-bounce {
+  0%   { transform: translateY(0); }
+  30%  { transform: translateY(-6px); }
+  55%  { transform: translateY(0); }
+  75%  { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+
+.cat-body.bounce {
+  animation: happy-bounce 0.5s ease-out 1;
+}
+
+/* Lean toward cursor — a small whole-body tilt, separate transform layer
+   so it can combine with breathing without fighting it (handled via JS-set
+   custom transform on a wrapping element instead of stacking CSS animations). */
+.cat-wrap.leaning .cat-img {
+  transition: filter 0.4s ease;
+}
+
+/* ---------- Response zone ---------- */
+
+.response-zone {
+  min-height: 64px;
+  width: min(440px, 86vw);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  margin: 22px 0 18px 0;
+  padding: 0 8px;
+}
+
+.response-line {
+  margin: 0;
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink);
+  text-align: center;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.response-line.visible {
+  opacity: 0.92;
+  transform: translateY(0);
+}
+
+.response-line .action {
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+.response-line .speech {
+  font-style: normal;
+}
+
+/* ---------- Input ---------- */
+
+.input-row {
+  width: min(360px, 80vw);
+}
+
+.text-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  background: transparent;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink);
+  padding: 8px 2px 10px 2px;
+  text-align: center;
+  letter-spacing: 0.01em;
+  transition: border-color 0.4s ease;
+}
+
+.text-input::placeholder {
+  color: #c7c3bc;
+  font-style: normal;
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: var(--ink-soft);
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-body.breathing,
+  .cat-body.affectionate,
+  .cat-body.annoyed,
+  .cat-body.bounce {
+    animation: none !important;
+  }
+  .response-line {
+    transition: opacity 0.3s ease !important;
+    transform: none !important;
+  }
+}
+
+/* ---------- Small screens ---------- */
+
+@media (max-width: 420px) {
+  :root {
+    --cat-size: 168px;
+  }
+  .response-line {
+    font-size: 15px;
+  }
+}
+
+@media (max-height: 560px) {
+  :root {
+    --cat-size: 140px;
+  }
+  .name {
+    margin-bottom: 16px;
+  }
+  .response-zone {
+    margin: 14px 0 12px 0;
+    min-height: 48px;
+  }
+}

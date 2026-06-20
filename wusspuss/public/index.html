@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>WussPuss</title>
+<meta name="description" content="A black cat lives here." />
+<link rel="icon" href="data:," />
+
+<!-- Quiet, restrained type pairing: a soft serif for the cat's own words (feels spoken/thought,
+     not typed-by-software), a plain low-key sans for everything structural (name, input, hints). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital@0;1&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- The whole experience lives in one still, centered column. No header, no chrome, no nav. -->
+  <main class="stage" id="stage">
+
+    <h1 class="name" id="nameLabel">WussPuss</h1>
+
+    <!-- The cat. A button semantically (it's clickable / pokeable) but visually just... a cat. -->
+    <button class="cat-wrap" id="catWrap" aria-label="Poke WussPuss">
+      <div class="cat-shadow" aria-hidden="true"></div>
+      <div class="cat-body" id="catBody">
+        <img src="cat.png" alt="" class="cat-img" id="catImg" draggable="false" />
+        <!-- Pupil overlays positioned over the source image's eye-white regions, so they can
+             move independently for the eye-tracking illusion. -->
+        <div class="pupil" id="pupilLeft"></div>
+        <div class="pupil" id="pupilRight"></div>
+      </div>
+    </button>
+
+    <!-- Only ever one line of response visible at a time. No log, no scroll, no stacking. -->
+    <div class="response-zone" aria-live="polite">
+      <p class="response-line" id="responseLine"></p>
+    </div>
+
+    <form class="input-row" id="inputForm" autocomplete="off">
+      <input
+        type="text"
+        id="textInput"
+        class="text-input"
+        placeholder="say something, or nothing at all"
+        maxlength="280"
+        aria-label="Speak to WussPuss"
+      />
+    </form>
+
+  </main>
+
+<script src="app.js"></script>
+</body>
+</html>
