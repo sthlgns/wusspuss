@@ -347,29 +347,42 @@ body {
 .input-row {
   width: min(360px, 80vw);
   position: relative;
+  /* The glow lives outside this row's own box, so this row must not clip
+     it — the page itself still controls scroll, this just stops the row
+     from cropping its own glow. */
+  overflow: visible;
 }
 
-/* The glow itself: a soft circular radial wash centered behind the input,
-   independent of the input's rectangular shape — same technique as the
-   cat's rim light, so it reads as a round halo rather than a glowing box. */
+/* The glow lives on this wrapper, not the <input> itself — <input> is a
+   replaced element and cannot render ::before/::after in any browser, so
+   the pseudo-element has to sit on a real container instead. Centered on
+   the underline (the input's bottom edge, which is also this row's bottom
+   edge since nothing sits below it). Two states layered via opacity: a
+   faint hover glow, a stronger focus glow (:focus-within, since focus
+   itself lives on the <input> inside this div). */
 .input-row::before {
   content: '';
   position: absolute;
-  top: 50%;
+  bottom: 0;
   left: 50%;
-  width: 220px;
-  height: 220px;
-  background: radial-gradient(circle, var(--lamp-glow-soft) 0%, var(--lamp-glow-faint) 45%, transparent 72%);
-  transform: translate(-50%, -50%) scale(0.4);
+  width: 200px;
+  height: 44px;
+  background: radial-gradient(ellipse, rgba(255, 217, 138, 0.38) 0%, rgba(255, 217, 138, 0.14) 50%, transparent 78%);
+  transform: translate(-50%, 50%) scale(0.55);
   opacity: 0;
   pointer-events: none;
   z-index: 0;
-  transition: opacity 0.6s var(--ease-smooth), transform 0.6s var(--ease-smooth);
+  transition: opacity 0.5s var(--ease-smooth), transform 0.5s var(--ease-smooth);
 }
 
-.input-row:has(.text-input:focus)::before {
+.input-row:hover::before {
+  opacity: 0.6;
+  transform: translate(-50%, 50%) scale(0.8);
+}
+
+.input-row:focus-within::before {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
+  transform: translate(-50%, 50%) scale(1);
 }
 
 .text-input {
@@ -420,7 +433,7 @@ body {
   }
   .input-row::before {
     transition: opacity 0.15s ease !important;
-    transform: translate(-50%, -50%) scale(1) !important;
+    transform: translate(-50%, 50%) scale(1) !important;
   }
 }
 
