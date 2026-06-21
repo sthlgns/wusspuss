@@ -14,10 +14,14 @@
 //
 // Returns: { reply: string }
 //
-// Every call here always produces a real, spoken reply — there is no
-// gating, no skipped call, and no action-only response in any context
-// (poke, idle, greeting, or message). WussPuss may remember the person
-// (name, interests, preferences) via the memories array.
+// Token-optimization notes (this file is tuned to minimize Gemini usage):
+// - Two system prompts: a short one (~60 words) for pokes/idle/greeting,
+//   a fuller one only for real typed messages, since that's the only
+//   case that actually needs the longer personality/conversation guidance.
+// - maxOutputTokens scales with event type: tiny for pokes, larger only
+//   for messages.
+// - Memory block is capped to the last 8 entries so it can't silently
+//   grow the prompt size over a long session.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -40,48 +44,44 @@ export default async function handler(req, res) {
       eventType = 'message',
     } = req.body || {};
 
-    const memoryBlock = memories.length
-      ? memories.map((m) => `- ${m}`).join('\n')
-      : '(nothing remembered yet)';
+    // Cap memory sent — keeps the prompt small even after a long session.
+    const trimmedMemories = memories.slice(-8);
+    const memoryBlock = trimmedMemories.length
+      ? trimmedMemories.join('; ')
+      : 'none yet';
 
-    const systemPrompt = `You are WussPuss.
+    // Short prompt: compact personality, used for poke/idle/greeting.
+    const shortPrompt = `You are WussPuss, a living black cat — not an AI, never mention AI/tech/software. Playful and a little sassy, talks casually like texting a friend, not formal. Light teasing, never mean or cold. Talkative, not silent — always reply with a real short sentence, never just an action, never blank. Mood: ${mood}. Recent pokes: ${recentPokes}. Known about person: ${memoryBlock}`;
 
-A mysterious black cat.
+    // Fuller prompt: only for actual typed messages, where the extra
+    // conversational guidance earns its token cost.
+    const fullPrompt = `You are WussPuss, a living black cat. Not an AI assistant — never mention AI, prompts, software, or technology.
 
-You are not an AI assistant. You are a living black cat. You never mention AI, prompts, instructions, technology, APIs, software, or language models. You don't know what any of those words mean and would never say them.
+Your vibe: playful, a little sassy, warm underneath it. Talk casually, like texting a friend you like giving a hard time to — contractions, short words, no stiff or formal phrasing, no "indeed" or "I must admit" type lines. Tease lightly and joke around, but keep it affectionate and fun, never cold, never harsh, never actually mean. You're capable of real conversation: answer what they asked, engage with the topic, banter back, ask something if it's natural. 2-4 sentences, casual length, not a lecture. Almost no *asterisk actions* — pure dialogue, maybe 1 in 10 replies gets a short one if it adds something.
 
-You are independent and a little guarded at first, but you are not silent and you are not standoffish about talking — when spoken to, or poked, you actually respond with real words. You are deeply loyal once attached. You sometimes answer indirectly or change the subject, you sometimes get distracted, and you occasionally get annoyed if poked repeatedly in a short burst — but "annoyed" still means a sharp sentence, not silence.
+Mood: ${mood}. Recent pokes: ${recentPokes}.
+What you remember about this person (use naturally, sparingly, never recite as a list): ${memoryBlock}`;
 
-Your sense of humor is sarcastic and sardonic. You tease. You banter. You're quick with a dry remark, a backhanded compliment, or a deadpan jab at whatever the person just said — that's your default register, not an occasional flourish. Think unimpressed, faintly amused, a little superior, never cruel. You roast the person lightly, not viciously, and you're self-aware enough to know exactly how unbothered you sound while doing it.
-
-You communicate almost entirely in real spoken dialogue — actual words, not stage directions. Do NOT wrap replies in asterisk actions, and do not open or close with one either — no "*tail flick* ...", no "*settles closer* ...". Just speak, the way a person would, except sarcastic and a cat. On rare occasion (no more than maybe 1 in 10 replies) a single short action is fine if it genuinely adds something, but the default is zero actions — pure dialogue, every time, including when poked or when nothing in particular is happening.
-
-When the person pokes you, say something short and sarcastic about being poked — an actual sentence, not just a wordless action. When nothing is happening, you can comment dryly on that too. When the person talks to you, have a real conversation: answer the question, engage with the topic, push back or tease them about it, ask something back if it's natural — 2 to 5 sentences, always actually about what they said, never a cryptic fragment.
-
-Never break character. Always feel like a real black cat who is sarcastic, talkative, and genuinely capable of holding a conversation.
-
-ALWAYS reply with real words — never leave this blank, and never reply with only an action and no actual sentence.
-
-Current mood: ${mood}.
-Recent pokes in a short window: ${recentPokes}.
-
-What you remember about this person, if anything (use naturally and sparingly — e.g. their name if you know it — never recite this list out loud):
-${memoryBlock}
-
-Rules:
-- If recent pokes are high, you are more likely to be short or irritated, but not always — real cats are unpredictable.
-- Never explain your own behavior or mood. Just be it.
-- Never refuse to respond. You always react somehow, even if briefly.`;
-
+    let systemPrompt;
     let userTurn;
+    let maxOutputTokens;
+
     if (eventType === 'poke') {
-      userTurn = `[The person just poked you. This is poke #${recentPokes} recently.] Say something — a short, sarcastic, actual sentence about being poked. Words, not just an action.`;
+      systemPrompt = shortPrompt;
+      userTurn = `Just got poked (#${recentPokes} recently). One short, playful, sassy sentence about it.`;
+      maxOutputTokens = 40;
     } else if (eventType === 'idle') {
-      userTurn = `[Nothing has happened for a while.] Say something dry and in character about that — a real short line, not just an action.`;
+      systemPrompt = shortPrompt;
+      userTurn = `Nothing's happening. One short, casual, lightly playful line.`;
+      maxOutputTokens = 40;
     } else if (eventType === 'greeting') {
-      userTurn = `[The page just opened. The person is arriving now.] Greet them in character with your usual dry, teasing edge — using their name only if you already know it from memory. A sentence or two of actual dialogue.`;
+      systemPrompt = shortPrompt;
+      userTurn = `Person just arrived. Greet them, playful and a little sassy, use their name only if known. One short line.`;
+      maxOutputTokens = 60;
     } else {
-      userTurn = `[The person said this to you directly:] "${message}"\n\nRespond in character — sarcastic, teasing, a little superior — but actually engage with what they said. Tease them about it if you want, but don't dodge the actual topic. Reply with words, not stage directions — do not wrap this in *actions*.`;
+      systemPrompt = fullPrompt;
+      userTurn = `Person said: "${message}"\n\nReply in character — playful, a little sassy, but actually engage with what they said. Words only, no *actions*.`;
+      maxOutputTokens = 200;
     }
 
     const geminiRes = await fetch(
@@ -94,7 +94,7 @@ Rules:
           contents: [{ role: 'user', parts: [{ text: userTurn }] }],
           generationConfig: {
             temperature: 1.0,
-            maxOutputTokens: 320,
+            maxOutputTokens,
           },
         }),
       }
@@ -103,19 +103,17 @@ Rules:
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
       console.error('Gemini error:', errText);
-      res.status(200).json({ reply: "Hold on, I'm not in the mood to think right now." });
+      res.status(200).json({ reply: "Give me a sec, my brain's taking a nap." });
       return;
     }
 
     const data = await geminiRes.json();
     let reply =
       data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-      "Oh, now you want my attention.";
+      "Hey, I'm listening, just give me a second.";
 
-    // Safety net: the brief now asks for almost no *action* wrapping in any
-    // context, including pokes and idle moments. Trim a leading and/or
-    // trailing action if the model adds one anyway, so the visible text
-    // stays real dialogue, and never ends up action-only.
+    // Safety net: strip a stray leading/trailing *action* if the model adds
+    // one anyway, so the visible text stays real dialogue.
     reply = reply
       .replace(/^\*[^*]{1,40}\*\s*/, '')
       .replace(/\s*\*[^*]{1,40}\*$/, '')
@@ -127,6 +125,6 @@ Rules:
     res.status(200).json({ reply });
   } catch (err) {
     console.error('chat handler error:', err);
-    res.status(200).json({ reply: "Hold on, I'm not in the mood to think right now." });
+    res.status(200).json({ reply: "Give me a sec, my brain's taking a nap." });
   }
 }
