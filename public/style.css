@@ -363,15 +363,16 @@ body {
 .input-row::before {
   content: '';
   position: absolute;
-  /* Centered on the whole row — text and underline together — rather than
-     just the underline, so the glow reads as an aura surrounding the
-     input, not a puddle sitting under it. */
-  top: 50%;
+  /* Anchored to the underline itself (this row's bottom edge), not the
+     whole row — kept small and mostly extending upward into the row
+     where there's room, so it can never push past the page's own bottom
+     padding and trigger a scrollbar. */
+  bottom: 0;
   left: 50%;
-  width: 260px;
-  height: 130px;
-  background: radial-gradient(ellipse, rgba(255, 217, 138, 0.30) 0%, rgba(255, 217, 138, 0.12) 45%, transparent 75%);
-  transform: translate(-50%, -50%) scale(0.6);
+  width: 180px;
+  height: 28px;
+  background: radial-gradient(ellipse, rgba(255, 217, 138, 0.42) 0%, rgba(255, 217, 138, 0.16) 50%, transparent 78%);
+  transform: translate(-50%, 30%) scale(0.6);
   opacity: 0;
   pointer-events: none;
   z-index: 0;
@@ -380,12 +381,12 @@ body {
 
 .input-row:hover::before {
   opacity: 0.55;
-  transform: translate(-50%, -50%) scale(0.85);
+  transform: translate(-50%, 30%) scale(0.85);
 }
 
 .input-row:focus-within::before {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
+  transform: translate(-50%, 30%) scale(1);
 }
 
 .text-input {
@@ -436,7 +437,7 @@ body {
   }
   .input-row::before {
     transition: opacity 0.15s ease !important;
-    transform: translate(-50%, -50%) scale(1) !important;
+    transform: translate(-50%, 30%) scale(1) !important;
   }
 }
 
