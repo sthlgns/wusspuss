@@ -346,9 +346,35 @@ body {
 
 .input-row {
   width: min(360px, 80vw);
+  position: relative;
+}
+
+/* The glow itself: a soft circular radial wash centered behind the input,
+   independent of the input's rectangular shape — same technique as the
+   cat's rim light, so it reads as a round halo rather than a glowing box. */
+.input-row::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, var(--lamp-glow-soft) 0%, var(--lamp-glow-faint) 45%, transparent 72%);
+  transform: translate(-50%, -50%) scale(0.4);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.6s var(--ease-smooth), transform 0.6s var(--ease-smooth);
+}
+
+.input-row:has(.text-input:focus)::before {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
 
 .text-input {
+  position: relative;
+  z-index: 1;
   width: 100%;
   border: none;
   border-bottom: 1px solid var(--hairline);
@@ -360,10 +386,7 @@ body {
   padding: 8px 2px 10px 2px;
   text-align: center;
   letter-spacing: 0.01em;
-  transition:
-    border-color 0.5s var(--ease-smooth),
-    box-shadow 0.5s var(--ease-smooth),
-    transform 0.3s var(--ease-smooth);
+  transition: border-color 0.5s var(--ease-smooth);
 }
 
 .text-input::placeholder {
@@ -371,12 +394,12 @@ body {
   font-style: normal;
 }
 
-/* Focus feels like the input catches a little of the lamp's warmth —
-   a soft glow beneath the line rather than a hard outline. */
+/* Borderless on focus too — no outline, no boxy box-shadow. The warmth
+   comes entirely from the circular glow behind it (see .input-row::before)
+   and a slightly brighter underline. */
 .text-input:focus {
   outline: none;
   border-color: var(--hairline-bright);
-  box-shadow: 0 1px 14px -2px var(--lamp-glow-soft);
 }
 
 /* ---------- Reduced motion ---------- */
@@ -394,6 +417,10 @@ body {
   .response-line {
     transition: opacity 0.3s ease !important;
     transform: none !important;
+  }
+  .input-row::before {
+    transition: opacity 0.15s ease !important;
+    transform: translate(-50%, -50%) scale(1) !important;
   }
 }
 
