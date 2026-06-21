@@ -20,11 +20,16 @@
 // Returns: { reply: string }
 //
 // Token-optimization notes:
+// - Using gemini-2.5-flash-lite (cheaper per-token than full flash) since
+//   call volume is now low — only greetings and real typed messages reach
+//   this endpoint at all.
 // - Memory block is capped to the last 8 entries so it can't silently grow
 //   the prompt size over a long session.
-// - thinkingConfig.thinkingBudget is set to 0 — without this, Gemini 2.5
-//   models can spend part of maxOutputTokens on internal reasoning tokens
-//   before the visible reply, which was cutting replies off mid-sentence.
+// - thinkingConfig.thinkingBudget is explicit rather than left to the
+//   default: 0 for the simple greeting line, a small 60 for real messages
+//   so Flash-Lite gets a little room to reason on substantive questions
+//   without the open-ended "thinking" behavior that was previously cutting
+//   replies off mid-sentence.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -67,19 +72,27 @@ Mood: ${mood}. Pokes: ${recentPokes}. Known about person: ${memoryBlock}`;
     let systemPrompt;
     let userTurn;
     let maxOutputTokens;
+    let thinkingBudget;
 
     if (eventType === 'greeting') {
       systemPrompt = shortPrompt;
       userTurn = `Person just arrived. Greet them casually, name only if known. One short line.`;
       maxOutputTokens = 100;
+      thinkingBudget = 0; // simple line, no reasoning needed
     } else {
       systemPrompt = fullPrompt;
       userTurn = `Person said: "${message}"\n\nAnswer them directly and casually. Words only, no *actions*. Keep any teasing minimal and only if it fits.`;
-      maxOutputTokens = 220;
+      maxOutputTokens = 280; // 60 reserved for thinking + room for the actual reply
+      // Small non-zero budget: Flash-Lite is a weaker reasoner than full
+      // Flash, so real messages (including comforting/philosophical ones)
+      // get a little room to actually think before answering, instead of
+      // forcing pure reflex output. Still tiny compared to maxOutputTokens,
+      // so cost stays low.
+      thinkingBudget = 60;
     }
 
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,9 +104,9 @@ Mood: ${mood}. Pokes: ${recentPokes}. Known about person: ${memoryBlock}`;
             maxOutputTokens,
             // Gemini 2.5 models spend part of the output budget on internal
             // "thinking" tokens by default, which can eat the whole cap and
-            // cut the visible reply off mid-sentence. Disabling it ensures
-            // the full maxOutputTokens budget goes to the actual reply.
-            thinkingConfig: { thinkingBudget: 0 },
+            // cut the visible reply off mid-sentence if left uncapped. We
+            // set an explicit small budget instead of leaving it unbounded.
+            thinkingConfig: { thinkingBudget },
           },
         }),
       }
