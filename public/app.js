@@ -160,14 +160,24 @@
       });
       if (!res.ok) throw new Error('bad response');
       const data = await res.json();
-      return data.reply || '*stares quietly*';
+      return data.reply || "Oh, now you want my attention.";
     } catch {
-      return '*ears twitch* ...';
+      return "Hold on, I'm not in the mood to think right now.";
     }
   }
 
+  // Token-saver: only run memory extraction roughly every 3rd real message.
+  // Most short exchanges have nothing new worth remembering anyway, so
+  // calling Gemini a second time after every single message wastes tokens
+  // for little gain.
+  let messageCountSinceExtraction = 0;
+
   async function extractMemoryFrom(userText, catReply) {
     if (!userText || userText.trim().length < 3) return;
+    messageCountSinceExtraction += 1;
+    if (messageCountSinceExtraction < 3) return;
+    messageCountSinceExtraction = 0;
+
     try {
       const res = await fetch('/api/extract-memory', {
         method: 'POST',
@@ -206,9 +216,47 @@
   }
 
   // -----------------------------------------------------------------------
-  // Poke handling — every poke always gets a real reply from Gemini.
+  // Poke reaction phrase banks — fully local, no API call. Pokes happen too
+  // often and too casually to justify a model round-trip; these read as
+  // instant reflexes, which is also just more honest to how a cat reacts.
   // -----------------------------------------------------------------------
-  catWrap.addEventListener('click', async (e) => {
+  const POKE_LINES = {
+    happy: [
+      "Oh, hi.",
+      "That's the spot. Don't tell anyone I said that.",
+      "Keep going, I won't admit I like it.",
+      "Fine. You're forgiven for existing.",
+      "Mm. More of that.",
+      "I'll allow it.",
+      "Don't get used to this.",
+      "You're alright, you know that?",
+    ],
+    affectionate: [
+      "...okay, that one was nice.",
+      "Don't stop on my account.",
+      "I guess I missed you a little.",
+      "You came back. Good.",
+      "Stay a while, I don't mind.",
+      "This is acceptable. Barely.",
+      "I'm not purring. You're imagining it.",
+    ],
+    annoyed: [
+      "Enough.",
+      "Watch it.",
+      "I will remember this.",
+      "That's poke number too many.",
+      "Rude.",
+      "Do that again and see what happens.",
+      "I was relaxing. Was.",
+      "Bold of you.",
+      "Excuse you.",
+    ],
+  };
+
+  // -----------------------------------------------------------------------
+  // Poke handling — fully local reaction, no network call, no tokens spent.
+  // -----------------------------------------------------------------------
+  catWrap.addEventListener('click', (e) => {
     e.preventDefault();
     if (pokeCooldown) return;
     pokeCooldown = true;
@@ -218,13 +266,7 @@
     const nextMood = chooseMoodForPoke(recentCount);
     applyMoodVisual(nextMood);
 
-    // Show a brief, instant local placeholder so the cat reacts immediately
-    // while the real reply is on its way — never the final word, always
-    // overwritten by the model's actual response below.
-    showResponse('*reacts*');
-
-    const reply = await askWussPuss({ message: 'poke', eventType: 'poke' });
-    showResponse(reply);
+    showResponse(randomFrom(POKE_LINES[nextMood] || POKE_LINES.happy));
   });
 
   // -----------------------------------------------------------------------
@@ -237,7 +279,7 @@
     textInput.value = '';
     textInput.blur();
 
-    showResponse('*watches you*');
+    showResponse('…');
 
     const reply = await askWussPuss({ message: text, eventType: 'message' });
     showResponse(reply);
@@ -272,13 +314,16 @@
   }
 
   // Occasional unprompted lines — rare, so they feel like a genuine glimpse
-  // of a private inner life rather than a notification.
+  // of a private inner life rather than a notification. Fully local, no
+  // network call — idle moments are ambient flavor, not real conversation.
   const IDLE_LINES = [
-    '*watches something invisible* "..."',
-    '*ears twitch* "Thought I heard something."',
-    '*glances away*',
-    '*tail flicks once, then stills*',
-    '*stares at a spot on the floor*',
+    "Don't mind me, just existing.",
+    "Still here. Riveting, I know.",
+    "Nothing to report. Try again later.",
+    "You can talk to me, you know. I don't bite. Often.",
+    "Just thinking. Don't ask about what.",
+    "I heard something. Probably nothing.",
+    "This is me, doing absolutely nothing.",
   ];
 
   function randomFrom(arr) {
@@ -286,17 +331,13 @@
   }
 
   function scheduleIdleMoment() {
-    const delay = 75000 + Math.random() * 140000; // roughly 1.25–3.5 min
-    setTimeout(async () => {
-      // Don't interrupt if the user is mid-typing.
-      if (document.activeElement !== textInput) {
-        const useModel = Math.random() < 0.3;
-        if (useModel) {
-          const reply = await askWussPuss({ message: '', eventType: 'idle' });
-          showResponse(reply);
-        } else {
-          showResponse(randomFrom(IDLE_LINES));
-        }
+    // Token-saver: longer interval, and skip entirely while the tab isn't
+    // visible — no point reacting for a tab nobody is looking at.
+    const delay = 150000 + Math.random() * 210000; // roughly 2.5–6 min
+    setTimeout(() => {
+      const userIsAway = document.activeElement === textInput || document.hidden;
+      if (!userIsAway) {
+        showResponse(randomFrom(IDLE_LINES));
       }
       scheduleIdleMoment();
     }, delay);
@@ -410,7 +451,7 @@
       placePupil(pupilRight, EYES.right, 0, 0, imgRect);
     });
 
-    showResponse('*notices you*');
+    showResponse('…');
     askWussPuss({ message: '', eventType: 'greeting' }).then(showResponse);
 
     scheduleBlink();
