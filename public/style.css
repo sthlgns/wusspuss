@@ -86,27 +86,37 @@ body {
   transition: opacity 1.2s var(--ease-smooth), color 1.2s var(--ease-smooth);
 }
 
-/* ---------- Scene: lamp + light cone + cat, as one composed group ---------- */
+/* ---------- Scene: lamp + light cone + cat, all anchored to one ground line ---------- */
 
 .scene {
   position: relative;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  width: min(420px, 92vw);
-  height: calc(var(--cat-size) + 130px);
+  width: min(460px, 92vw);
+  height: calc(var(--cat-size) * 1.95);
+  margin-bottom: 4px;
 }
 
-/* The lamp stands just to the right of the cat, slightly behind it. */
+/* The one shared baseline. Nothing in the scene floats independently of it:
+   the lamp's base plate sits on it, and the cat's actual feet (not the
+   bounding box of its image, which has empty margin above/below the
+   silhouette) are aligned to it too. */
+.ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14%;
+  height: 1px;
+}
+
+/* The lamp stands to the right of the cat, its base plate sitting exactly
+   on the ground line. */
 .lamp {
   position: absolute;
-  right: calc(50% - var(--cat-size) * 0.78);
-  bottom: 2%;
-  height: calc(var(--cat-size) * 1.62);
+  bottom: 14%;
+  left: 64%;
+  height: calc(var(--cat-size) * 1.85);
   width: auto;
   z-index: 1;
   overflow: visible;
-  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.4));
 }
 
 .lamp-glow {
@@ -125,23 +135,23 @@ body {
   74%      { opacity: 0.96; }
 }
 
-/* The cone of light: a soft triangular wash falling from the bulb down and
-   to the left, over the cat. Built from a clipped gradient rather than an
-   image so edges stay perfectly soft. Positioned to originate near the
-   lamp's bulb and widen as it falls. */
+/* The cone of light: anchored at the lamp head's light-emitting point,
+   widening as it falls down and to the left, ending at the ground —
+   matching where the lamp head actually sits rather than a generic diagonal. */
 .light-cone {
   position: absolute;
-  top: -8%;
-  right: calc(50% - var(--cat-size) * 0.78);
-  width: 78%;
-  height: 92%;
+  bottom: 14%;
+  left: 4%;
+  width: 70%;
+  height: 80%;
   background: linear-gradient(
-    160deg,
+    178deg,
     var(--lamp-glow-soft) 0%,
-    var(--lamp-glow-faint) 45%,
-    transparent 78%
+    var(--lamp-glow-soft) 55%,
+    var(--lamp-glow-faint) 80%,
+    transparent 100%
   );
-  clip-path: polygon(78% 0%, 100% 4%, 38% 100%, 8% 100%);
+  clip-path: polygon(86% 0%, 100% 5%, 42% 100%, 10% 100%);
   pointer-events: none;
   z-index: 0;
   mix-blend-mode: screen;
@@ -151,7 +161,13 @@ body {
 /* ---------- Cat ---------- */
 
 .cat-wrap {
-  position: relative;
+  position: absolute;
+  /* The source image has the cat's feet at ~82.1% down its own square
+     canvas (empty margin above the ears and below the feet), so the box
+     is sized taller than the visual cat and shifted so the FEET land on
+     the shared ground line, not the box's own bottom edge. */
+  bottom: calc(14% - (var(--cat-size) * (1 - 0.821)));
+  left: 16%;
   background: none;
   border: none;
   padding: 0;
@@ -159,9 +175,6 @@ body {
   cursor: pointer;
   width: var(--cat-size);
   height: var(--cat-size);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   -webkit-tap-highlight-color: transparent;
   z-index: 2;
 }
@@ -172,17 +185,21 @@ body {
   border-radius: 8px;
 }
 
-/* Shadow falls away from the lamp (lamp sits to the cat's right, so the
-   shadow stretches left), soft and warm-dark rather than flat black —
-   it breathes very slightly with the cat via the .breathing class below. */
+/* Shadow sits on the same ground line as the lamp's base, directly under
+   the cat's actual feet, stretching away from the lamp (lamp is to the
+   right, so the shadow stretches left) — it breathes very subtly with the
+   cat via the .breathing class below. */
 .cat-shadow {
   position: absolute;
-  bottom: 2%;
-  left: 38%;
-  width: 64%;
-  height: 16px;
+  /* The cat's feet sit ~17.9% up from the bottom of its own image box
+     (the source PNG has empty margin below the silhouette) — so the
+     shadow needs to sit AT that height, not at the box's bottom edge. */
+  bottom: calc(var(--cat-size) * 0.179 - 7px);
+  left: 50%;
+  width: 58%;
+  height: 12px;
   background: radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 78%);
-  transform: translateX(-50%) rotate(-2deg);
+  transform: translateX(-54%) rotate(-1deg);
   transition: width 0.6s var(--ease-smooth), opacity 0.6s var(--ease-smooth);
   pointer-events: none;
   z-index: 0;
@@ -192,7 +209,7 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
-  transform-origin: 50% 88%; /* roughly the cat's haunches — lean/tilt pivots from where it sits */
+  transform-origin: 50% 82%; /* the cat's actual haunches/feet line, not the box center */
   will-change: transform;
   z-index: 1;
   /* Sitting inside the lamp's light: a warm rim so the black silhouette

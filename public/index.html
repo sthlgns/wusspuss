@@ -23,41 +23,48 @@
     <h1 class="name" id="nameLabel">WussPuss</h1>
 
     <!-- The scene: a streetlamp beside the cat, a cone of warm light falling across it,
-         and the cat sitting in that pool of light with a shadow cast away from the lamp. -->
+         and the cat sitting in that pool of light on the same ground line as the lamp's base. -->
     <div class="scene" id="scene">
 
-      <!-- Light cone — a soft triangular wash of warm light from the lamp's bulb down
-           over the cat. Pure CSS gradient, no image, so it scales cleanly. -->
+      <!-- Ground line: the one shared baseline that the lamp's base and the cat's
+           shadow both sit on, so nothing floats independently of anything else. -->
+      <div class="ground" aria-hidden="true"></div>
+
+      <!-- Light cone — anchored to the lamp head's exact position, widening as it
+           falls to the ground. Pure CSS gradient, no image, so it scales cleanly. -->
       <div class="light-cone" aria-hidden="true"></div>
 
-      <!-- Streetlamp: post + arm + bulb, all SVG so the glow can be a true radial light
-           sitting right at the bulb instead of a separate floating blur. -->
-      <svg class="lamp" id="lampSvg" viewBox="0 0 120 360" aria-hidden="true">
+      <!-- Streetlamp: tall straight post + angled flat head, modeled on a real
+           streetlamp silhouette — light spills downward from the underside of
+           the head, not from a round bulb on a curved arm. -->
+      <svg class="lamp" id="lampSvg" viewBox="0 0 100 400" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
         <defs>
           <radialGradient id="bulbGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#ffe9b8" stop-opacity="0.95" />
-            <stop offset="35%" stop-color="#ffd98a" stop-opacity="0.55" />
+            <stop offset="0%" stop-color="#ffe9b8" stop-opacity="0.9" />
+            <stop offset="40%" stop-color="#ffd98a" stop-opacity="0.4" />
             <stop offset="100%" stop-color="#ffd98a" stop-opacity="0" />
           </radialGradient>
         </defs>
-        <!-- glow halo behind the bulb -->
-        <circle class="lamp-glow" cx="60" cy="54" r="46" fill="url(#bulbGlow)" />
-        <!-- post -->
-        <rect x="56" y="86" width="8" height="266" rx="3" fill="var(--lamp-post)" />
-        <!-- base -->
-        <path d="M40 350 L80 350 L74 360 L46 360 Z" fill="var(--lamp-post)" />
-        <!-- curved arm -->
-        <path d="M60 86 C 60 60, 60 40, 84 32" stroke="var(--lamp-post)" stroke-width="7" fill="none" stroke-linecap="round" />
-        <!-- lamp housing -->
-        <path d="M70 26 L98 26 L92 40 L76 40 Z" fill="var(--lamp-post)" />
-        <!-- bulb -->
-        <circle class="lamp-bulb" cx="84" cy="33" r="6.5" fill="#ffe9b8" />
+
+        <!-- glow halo at the light source, under the head -->
+        <ellipse class="lamp-glow" cx="50" cy="46" rx="40" ry="30" fill="url(#bulbGlow)" />
+
+        <!-- post: tall, thin, straight, planted at the ground line -->
+        <rect x="47" y="40" width="6" height="352" fill="var(--lamp-post)" />
+
+        <!-- base plate at the ground -->
+        <path d="M34 388 L66 388 L62 396 L38 396 Z" fill="var(--lamp-post)" />
+
+        <!-- lamp head: angled flat fixture jutting slightly to one side, like the reference -->
+        <path d="M50 40 L50 30 L78 24 C 83 23, 85 26, 82 29 L52 38 Z" fill="var(--lamp-post)" />
+
+        <!-- light-emitting underside of the head -->
+        <ellipse class="lamp-bulb" cx="64" cy="34" rx="14" ry="3.4" fill="#ffe9b8" />
       </svg>
 
       <!-- The cat. A button semantically (it's clickable / pokeable) but visually just... a cat,
-           sitting in the lamp's pool of light. -->
+           standing on the same ground line as the lamp, in its pool of light. -->
       <button class="cat-wrap" id="catWrap" aria-label="Poke WussPuss">
-        <div class="cat-shadow" aria-hidden="true"></div>
         <div class="cat-body" id="catBody">
           <img src="cat.png" alt="" class="cat-img" id="catImg" draggable="false" />
           <!-- Pupil overlays positioned over the source image's eye-white regions, so they can
@@ -65,6 +72,7 @@
           <div class="pupil" id="pupilLeft"></div>
           <div class="pupil" id="pupilRight"></div>
         </div>
+        <div class="cat-shadow" aria-hidden="true"></div>
       </button>
 
     </div>
