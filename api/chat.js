@@ -3,25 +3,28 @@
 // Serverless function (Vercel) that talks to Gemini on WussPuss's behalf.
 // The API key lives only here, server-side, never in the browser.
 //
+// Only called for: "greeting" (once per page load) and "message" (an actual
+// typed message from the person). Pokes and idle moments are handled fully
+// client-side now with local randomized phrase banks — see app.js — since
+// they're frequent, low-stakes, and don't need a model call.
+//
 // Expects POST body:
 // {
-//   message: string,            // what the user just said / did (e.g. "poked" or actual text)
+//   message: string,            // the person's typed text (only used for "message")
 //   mood: "neutral"|"happy"|"annoyed"|"affectionate",
 //   memories: string[],         // short factual memory lines pulled from localStorage
-//   recentPokes: number,        // pokes in the last short window, for irritation context
-//   eventType: "message"|"poke"|"idle"|"greeting"  // what kind of trigger this is
+//   recentPokes: number,        // pokes in the last short window, for light context
+//   eventType: "message"|"greeting"
 // }
 //
 // Returns: { reply: string }
 //
-// Token-optimization notes (this file is tuned to minimize Gemini usage):
-// - Two system prompts: a short one (~60 words) for pokes/idle/greeting,
-//   a fuller one only for real typed messages, since that's the only
-//   case that actually needs the longer personality/conversation guidance.
-// - maxOutputTokens scales with event type: tiny for pokes, larger only
-//   for messages.
-// - Memory block is capped to the last 8 entries so it can't silently
-//   grow the prompt size over a long session.
+// Token-optimization notes:
+// - Memory block is capped to the last 8 entries so it can't silently grow
+//   the prompt size over a long session.
+// - thinkingConfig.thinkingBudget is set to 0 — without this, Gemini 2.5
+//   models can spend part of maxOutputTokens on internal reasoning tokens
+//   before the visible reply, which was cutting replies off mid-sentence.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -50,7 +53,7 @@ export default async function handler(req, res) {
       ? trimmedMemories.join('; ')
       : 'none yet';
 
-    // Short prompt: compact personality, used for poke/idle/greeting.
+    // Short prompt: compact personality, used only for the once-per-load greeting.
     const shortPrompt = `You are WussPuss, a living black cat, not an AI. Casual, friendly, like texting a friend. Mostly straightforward; occasionally a little playful/sassy, not every time. Always a real short reply, never blank, no actions. Mood: ${mood}. Pokes: ${recentPokes}. Known: ${memoryBlock}`;
 
     // Fuller prompt: only for actual typed messages, where the extra
@@ -65,22 +68,14 @@ Mood: ${mood}. Pokes: ${recentPokes}. Known about person: ${memoryBlock}`;
     let userTurn;
     let maxOutputTokens;
 
-    if (eventType === 'poke') {
-      systemPrompt = shortPrompt;
-      userTurn = `Just got poked (#${recentPokes} recently). One short casual reaction.`;
-      maxOutputTokens = 40;
-    } else if (eventType === 'idle') {
-      systemPrompt = shortPrompt;
-      userTurn = `Nothing's happening. One short casual line.`;
-      maxOutputTokens = 40;
-    } else if (eventType === 'greeting') {
+    if (eventType === 'greeting') {
       systemPrompt = shortPrompt;
       userTurn = `Person just arrived. Greet them casually, name only if known. One short line.`;
-      maxOutputTokens = 60;
+      maxOutputTokens = 100;
     } else {
       systemPrompt = fullPrompt;
       userTurn = `Person said: "${message}"\n\nAnswer them directly and casually. Words only, no *actions*. Keep any teasing minimal and only if it fits.`;
-      maxOutputTokens = 150;
+      maxOutputTokens = 220;
     }
 
     const geminiRes = await fetch(
@@ -94,6 +89,11 @@ Mood: ${mood}. Pokes: ${recentPokes}. Known about person: ${memoryBlock}`;
           generationConfig: {
             temperature: 1.0,
             maxOutputTokens,
+            // Gemini 2.5 models spend part of the output budget on internal
+            // "thinking" tokens by default, which can eat the whole cap and
+            // cut the visible reply off mid-sentence. Disabling it ensures
+            // the full maxOutputTokens budget goes to the actual reply.
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
       }
