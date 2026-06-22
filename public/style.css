@@ -363,15 +363,12 @@ body {
 .input-row::before {
   content: '';
   position: absolute;
-  /* Anchored to the underline itself (this row's bottom edge), not the
-     whole row — kept small and mostly extending upward into the row
-     where there's room, so it can never push past the page's own bottom
-     padding and trigger a scrollbar. */
   bottom: 0;
   left: 50%;
-  width: 240px;
-  height: 50px;
-  background: radial-gradient(ellipse, rgba(255, 217, 138, 0.45) 0%, rgba(255, 217, 138, 0.18) 50%, transparent 78%);
+  width: 100%;
+  max-width: 320px;
+  height: 56px;
+  background: radial-gradient(ellipse, rgba(255, 217, 138, 0.40) 0%, rgba(255, 217, 138, 0.15) 50%, transparent 78%);
   transform: translate(-50%, 50%) scale(0.7);
   opacity: 0;
   pointer-events: none;
@@ -380,12 +377,12 @@ body {
 }
 
 .input-row:hover::before {
-  opacity: 0.55;
+  opacity: 0.4;
   transform: translate(-50%, 50%) scale(0.85);
 }
 
 .input-row:focus-within::before {
-  opacity: 1;
+  opacity: 0.65;
   transform: translate(-50%, 50%) scale(1);
 }
 
